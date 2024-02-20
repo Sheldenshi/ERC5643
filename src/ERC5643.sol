@@ -2,6 +2,7 @@
 
 pragma solidity ^0.8.13;
 
+import {ERC721URIStorage} from "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "./IERC5643.sol";
 
@@ -12,7 +13,9 @@ error SubscriptionNotRenewable();
 error InvalidTokenId();
 error CallerNotOwnerNorApproved();
 
-contract ERC5643 is ERC721, IERC5643 {
+contract ERC5643 is ERC721URIStorage, IERC5643 {
+    
+
     mapping(uint256 => uint64) private _expirations;
 
     uint64 private minimumRenewalDuration;
