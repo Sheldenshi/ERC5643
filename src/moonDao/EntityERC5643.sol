@@ -13,6 +13,9 @@ contract MoonDaoEntityERC5643 is Ownable, ERC5643 {
 
     bool renewable;
 
+    // Discount for renewal more than 12 months. Denominator is 1000.
+    uint256 public renewDiscount = 200;
+
     constructor(string memory name_, string memory symbol_)
         ERC5643(name_, symbol_)
     {}
@@ -52,8 +55,10 @@ contract MoonDaoEntityERC5643 is Ownable, ERC5643 {
         view
         override
         returns (uint256)
-    {
-        return duration * pricePerSecond;
+    {   
+        uint256 price = duration * pricePerSecond;
+        
+        return duration >= 3153600 ? price * renewDiscount / 1000  : price;
     }
 
     function _isRenewable(uint256 tokenId)
@@ -85,9 +90,17 @@ contract MoonDaoEntityERC5643 is Ownable, ERC5643 {
         _extendSubscription(tokenId, duration);
     }
 
+    // Disable token transfers
     function _beforeTokenTransfer(address from, address to, uint256 tokenId) internal virtual override {
         require (from == address(0) || to == address(0), "You may not transfer your token!");
     }
+
+    function setTokenURI(uint256 tokenId, string memory _uri) public {
+        require(_isApprovedOrOwner(msg.sender, tokenId) || _msgSender() == owner(), "Only token owner or contract owner can set URI");
+        _setTokenURI(tokenId, _uri);
+    }
+
+
 
     
 }

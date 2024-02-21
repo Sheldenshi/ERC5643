@@ -18,8 +18,8 @@ contract ERC5643 is ERC721URIStorage, IERC5643 {
 
     mapping(uint256 => uint64) private _expirations;
 
-    uint64 private minimumRenewalDuration;
-    uint64 private maximumRenewalDuration;
+    uint64 internal minimumRenewalDuration;
+    uint64 internal maximumRenewalDuration;
 
     constructor(string memory name_, string memory symbol_)
         ERC721(name_, symbol_)

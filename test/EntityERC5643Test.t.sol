@@ -128,4 +128,28 @@ contract ERC5643Test is Test {
         vm.expectRevert("You may not transfer your token!");
         erc5643.transferFrom(user1, user2, 0);
     }
+
+    function testURI() public {
+        string memory tokenURI = erc5643.tokenURI(tokenId);
+        assertEq(tokenURI, uri);
+    }
+
+    function testContractOnwerUpdateURI() public {
+        erc5643.setTokenURI(tokenId, "https://reandom.com");
+        string memory tokenURI = erc5643.tokenURI(tokenId);
+        assertEq(tokenURI, "https://reandom.com");
+    }
+
+    function testTokenOnwerUpdateURI() public {
+        vm.prank(user1);
+        erc5643.setTokenURI(tokenId, "https://reandom.com");
+        string memory tokenURI = erc5643.tokenURI(tokenId);
+        assertEq(tokenURI, "https://reandom.com");
+    }
+
+    function testNotTokenOwnerUpdateURI() public {
+        vm.prank(user2);
+        vm.expectRevert("Only token owner or contract owner can set URI");
+        erc5643.setTokenURI(tokenId, "https://reandom.com");
+    }
 }
