@@ -29,7 +29,7 @@ contract ERC5643 is ERC721URIStorage, IERC5643 {
      * @dev See {IERC5643-renewSubscription}.
      */
     function renewSubscription(uint256 tokenId, uint64 duration)
-        external
+        public
         payable
         virtual
     {

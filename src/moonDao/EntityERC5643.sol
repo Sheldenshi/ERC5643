@@ -11,7 +11,7 @@ contract MoonDaoEntityERC5643 is Ownable, ERC5643 {
 
     uint256 private _nextTokenId;
 
-    bool renewable;
+    bool renewable = true;
 
     // Discount for renewal more than 12 months. Denominator is 1000.
     uint256 public renewDiscount = 200;
@@ -40,13 +40,14 @@ contract MoonDaoEntityERC5643 is Ownable, ERC5643 {
 
 
     function mintWithSubscription(address to, uint64 duration, string memory tokenURI)
+        payable
         public returns (uint256)
     {
         uint256 tokenId = _nextTokenId++;
 
         _mint(to, tokenId);
         _setTokenURI(tokenId, tokenURI);
-        _extendSubscription(tokenId, duration);
+        renewSubscription(tokenId, duration);
         return tokenId;
     }
 
@@ -58,7 +59,7 @@ contract MoonDaoEntityERC5643 is Ownable, ERC5643 {
     {   
         uint256 price = duration * pricePerSecond;
         
-        return duration >= 3153600 ? price * renewDiscount / 1000  : price;
+        return duration >= 3153600 ? price * (1000 - renewDiscount) / 1000  : price;
     }
 
     function _isRenewable(uint256 tokenId)
