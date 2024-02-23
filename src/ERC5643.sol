@@ -33,9 +33,9 @@ contract ERC5643 is ERC721URIStorage, IERC5643 {
         payable
         virtual
     {
-        if (!_isApprovedOrOwner(msg.sender, tokenId)) {
-            revert CallerNotOwnerNorApproved();
-        }
+        // if (!_isApprovedOrOwner(msg.sender, tokenId)) {
+        //     revert CallerNotOwnerNorApproved();
+        // }
 
         if (duration < minimumRenewalDuration) {
             revert RenewalTooShort();

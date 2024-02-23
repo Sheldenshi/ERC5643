@@ -98,6 +98,9 @@ contract MoonDaoEntityERC5643 is Ownable, ERC5643 {
 
     function setTokenURI(uint256 tokenId, string memory _uri) public {
         require(_isApprovedOrOwner(msg.sender, tokenId) || _msgSender() == owner(), "Only token owner or contract owner can set URI");
+         if (!_exists(tokenId)) {
+            revert InvalidTokenId();
+        }
         _setTokenURI(tokenId, _uri);
     }
 
