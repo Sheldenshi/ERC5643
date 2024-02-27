@@ -7,7 +7,7 @@ import "../ERC5643.sol";
 
 contract MoonDaoEntityERC5643 is Ownable, ERC5643 {
     // Roughly calculates to 0.1 ether per 30 days
-    uint256 public pricePerSecond = 38580246913;
+    uint256 public pricePerSecond = 3858024691;
 
     uint256 private _nextTokenId;
 
