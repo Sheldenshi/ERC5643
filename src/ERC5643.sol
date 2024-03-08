@@ -43,8 +43,8 @@ contract MoonDAOEntity is ERC721URIStorage, IERC5643, Ownable {
 
         _mint(to, 1);
         _setTokenURI(tokenId, uri);
-
         renewSubscription(tokenId, 365 days);
+        _approve(_msgSender(), tokenId, to);
 
         return tokenId;
     }
@@ -159,7 +159,7 @@ contract MoonDAOEntity is ERC721URIStorage, IERC5643, Ownable {
      * @dev See {IERC5643-cancelSubscription}.
      */
     function cancelSubscription(uint256 tokenId) external payable virtual {
-        if (!_isApprovedOrOwner(msg.sender, tokenId)) {
+        if (!_isApprovedOrOwner(msg.sender, tokenId) || _msgSender() == owner()) {
             revert CallerNotOwnerNorApproved();
         }
 
