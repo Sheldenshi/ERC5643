@@ -31,6 +31,8 @@ contract MoonDAOEntity is ERC721URIStorage, IERC5643, Ownable {
     uint64 internal minimumRenewalDuration;
     uint64 internal maximumRenewalDuration;
 
+    mapping(uint256 => address) private _admin;
+
     constructor(string memory name_, string memory symbol_)
         ERC721A(name_, symbol_) 
     {
@@ -44,7 +46,7 @@ contract MoonDAOEntity is ERC721URIStorage, IERC5643, Ownable {
         _mint(to, 1);
         _setTokenURI(tokenId, uri);
         renewSubscription(tokenId, 365 days);
-        _approve(_msgSender(), tokenId, to);
+        _admin[tokenId] = _msgSender();
 
         return tokenId;
     }
@@ -94,13 +96,14 @@ contract MoonDAOEntity is ERC721URIStorage, IERC5643, Ownable {
     }
 
     function setTokenURI(uint256 tokenId, string memory _uri) public {
-        require(_isApprovedOrOwner(msg.sender, tokenId) || _msgSender() == owner(), "Only token owner or contract owner can set URI");
+        require(_isApprovedOrOwner(msg.sender, tokenId) || _msgSender() == owner() || _msgSender() == _admin[tokenId], "Only token owner or contract owner can set URI");
          if (!_exists(tokenId)) {
             revert InvalidTokenId();
         }
         _setTokenURI(tokenId, _uri);
     }
 
+ 
     /**
      *  This function returns who is authorized to set the owner of your contract.
      *  Only allow the current owner to set the contract's new owner.
@@ -196,6 +199,32 @@ contract MoonDAOEntity is ERC721URIStorage, IERC5643, Ownable {
             revert InvalidTokenId();
         }
         return _isRenewable(tokenId);
+    }
+
+    function setAdmin(uint256 tokenId, address newAdmin) public {
+         if (!_exists(tokenId)) {
+            revert InvalidTokenId();
+        }
+
+        if (_msgSender() != this.ownerOf(tokenId) || _msgSender() != _admin[tokenId]) {
+            revert("Not Admin or onwer");
+        }
+        _admin[tokenId] = newAdmin;
+    }
+
+    /**
+     * @dev See {IERC5643-expiresAt}.
+     */
+    function getAdmin(uint256 tokenId)
+        external
+        view
+        virtual
+        returns (address)
+    {
+        if (!_exists(tokenId)) {
+            revert InvalidTokenId();
+        }
+        return _admin[tokenId];
     }
 
     /**

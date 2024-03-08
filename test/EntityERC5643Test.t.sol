@@ -26,6 +26,16 @@ contract ERC5643Test is Test {
         assertEq(token1, tokenId);
     }
 
+    function testAdminSetURI() public {
+        vm.deal(user3, 10 ether);
+        vm.prank(user3);
+        uint256 tokenId = erc5643.mintTo{value: 0.1 ether}(user2, uri);
+        vm.prank(user3);
+        erc5643.setTokenURI(tokenId, "https://reandom.com");
+        string memory tokenURI = erc5643.tokenURI(tokenId);
+        assertEq(tokenURI, "https://reandom.com");
+    }
+
     function testRenewalInvalidTokenId() public {
         vm.prank(user1);
         vm.expectRevert(InvalidTokenId.selector);
