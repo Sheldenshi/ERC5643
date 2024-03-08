@@ -4,7 +4,6 @@ pragma solidity ^0.8.13;
 
 import "forge-std/Test.sol";
 import "../src/ERC5643.sol";
-import "../src/moonDao/EntityERC5643.sol";
 
 contract ERC5643Test is Test {
     event SubscriptionUpdate(uint256 indexed tokenId, uint64 expiration);
@@ -16,14 +15,14 @@ contract ERC5643Test is Test {
     uint256 tokenId2 = 1;
     uint256 tokenId3= 2;
     string uri = "https://test.com";
-    MoonDaoEntityERC5643 erc5643;
+    MoonDAOEntity erc5643;
 
     function setUp() public {
-        vm.deal(user1, 1 ether);
-        vm.deal(user2, 1 ether);
+        vm.deal(user1, 10 ether);
+        vm.deal(user2, 10 ether);
 
-        erc5643 = new MoonDaoEntityERC5643("erc5369", "ERC5643");
-        uint256 token1 = erc5643.mint(user1, uri);
+        erc5643 = new MoonDAOEntity("erc5369", "ERC5643");
+        uint256 token1 = erc5643.mintTo{value: 0.1 ether}(user1, uri);
         assertEq(token1, tokenId);
     }
 
@@ -55,30 +54,29 @@ contract ERC5643Test is Test {
     function testRenewalInsufficientPayment() public {
         vm.prank(user1);
         vm.expectRevert(InsufficientPayment.selector);
-        erc5643.renewSubscription{value: 0.09 ether}(tokenId, 30 days);
+        erc5643.renewSubscription{value: 0.008 ether}(tokenId, 30 days);
     }
 
     function testRenewalExistingSubscription() public {
         vm.warp(1000);
         vm.prank(user1);
-        // console.logBool(erc5643.isRenewable(tokenId));
         vm.expectEmit(true, true, false, true);
-        emit SubscriptionUpdate(tokenId, 30 days + 1000);
+        emit SubscriptionUpdate(tokenId, 365 days + 30 days + 1);
         erc5643.renewSubscription{value: 0.1 ether}(tokenId, 30 days);
-        assertEq(user1.balance, 0.9 ether);
+        assertEq(user1.balance, 9.9 ether);
     }
 
     function testRenewalNewSubscription() public {
         vm.warp(1000);
         vm.prank(user2);
         vm.expectEmit(true, true, false, true);
-        emit SubscriptionUpdate(tokenId2, 60 days + 1000);
-        erc5643.mintWithSubscription{value: 0.2 ether}(user2, 60 days, uri);
+        emit SubscriptionUpdate(tokenId2, 365 days + 1000);
+        erc5643.mintTo{value: 0.1 ether}(user2, uri);
 
         // This renewal will succeed because the subscription is renewable
         vm.prank(user2);
         vm.expectEmit(true, true, false, true);
-        emit SubscriptionUpdate(tokenId2, 90 days + 1000);
+        emit SubscriptionUpdate(tokenId2, 365 days + 30 days + 1000);
         erc5643.renewSubscription{value: 0.1 ether}(tokenId2, 30 days);
     }
 
@@ -97,10 +95,10 @@ contract ERC5643Test is Test {
     function testExpiresAt() public {
         vm.warp(1000);
 
-        assertEq(erc5643.expiresAt(tokenId), 0);
+        assertEq(erc5643.expiresAt(tokenId), 31536001);
         vm.startPrank(user1);
         erc5643.renewSubscription{value: 0.1 ether}(tokenId, 2000);
-        assertEq(erc5643.expiresAt(tokenId), 3000);
+        assertEq(erc5643.expiresAt(tokenId), 31536001 + 2000 );
 
         erc5643.cancelSubscription(tokenId);
         assertEq(erc5643.expiresAt(tokenId), 0);
@@ -118,7 +116,7 @@ contract ERC5643Test is Test {
 
     function testExtendSubscriptionInvalidToken() public {
         vm.expectRevert(InvalidTokenId.selector);
-        erc5643.extendSubscription(tokenId + 100, 30 days);
+        erc5643.renewSubscription{value: 0.1 ether}(tokenId + 100, 30 days);
     }
 
     function testRenewalDiscount() public {
@@ -126,14 +124,14 @@ contract ERC5643Test is Test {
         vm.startPrank(user2);
 
         vm.expectEmit(true, true, false, true);
-        emit SubscriptionUpdate(tokenId2, 60 days + 1000);
-        uint256 id = erc5643.mintWithSubscription{value: 0.2 ether}(user2, 60 days, uri);
-        assertEq(erc5643.expiresAt(tokenId2), 60 days + 1000);
+        emit SubscriptionUpdate(tokenId2, 365 days + 1000);
+        uint256 id = erc5643.mintTo{value: 1 ether}(user2, uri);
+        assertEq(erc5643.expiresAt(tokenId2), 365 days + 1000);
 
         vm.deal(user2, 1 ether);
         // without discount it's 1.2 eth
         vm.expectEmit(true, true, false, true);
-        emit SubscriptionUpdate(tokenId2, 365 days + 60 days + 1000);
+        emit SubscriptionUpdate(tokenId2, 365 days + 365 days + 1000);
         erc5643.renewSubscription{value: 1 ether}(tokenId2, 365 days);
         
     }

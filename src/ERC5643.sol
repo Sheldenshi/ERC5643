@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.13;
+pragma solidity ^0.8.20;
 
-import {ERC721URIStorage} from "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
-import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import "@thirdweb-dev/contracts/extension/Ownable.sol";
+import "@thirdweb-dev/contracts/eip/ERC721A.sol";
 import "./IERC5643.sol";
+import {ERC721URIStorage} from "./ERC721URIStorage.sol";
 
 error RenewalTooShort();
 error RenewalTooLong();
@@ -13,8 +14,17 @@ error SubscriptionNotRenewable();
 error InvalidTokenId();
 error CallerNotOwnerNorApproved();
 
-contract ERC5643 is ERC721URIStorage, IERC5643 {
+contract MoonDAOEntity is ERC721URIStorage, IERC5643, Ownable {
     
+    
+    // For example: targeted subscription = 0.5 eth / 365 days.
+    // pricePerSecond = 5E17 wei / 31536000 (seconds in 365 days)
+
+    // Roughly calculates to 0.1 (1E17 wei) ether per 365 days.
+    uint256 public pricePerSecond = 3150024690;
+
+    // Discount for renewal more than 12 months. Denominator is 1000.
+    uint256 public renewDiscount = 200;
 
     mapping(uint256 => uint64) private _expirations;
 
@@ -22,8 +32,31 @@ contract ERC5643 is ERC721URIStorage, IERC5643 {
     uint64 internal maximumRenewalDuration;
 
     constructor(string memory name_, string memory symbol_)
-        ERC721(name_, symbol_)
-    {}
+        ERC721A(name_, symbol_) 
+    {
+        _setupOwner(_msgSender());
+    }
+
+    function mintTo(address to, string calldata uri) external payable returns (uint256) {
+
+        uint256 tokenId = _currentIndex;
+
+        _mint(to, 1);
+        _setTokenURI(tokenId, uri);
+
+        renewSubscription(tokenId, 365 days);
+
+        return tokenId;
+    }
+
+    /**
+     * Allow owner to change the subscription price
+     * @param _pricePerSecond new pricePerSecond
+     */
+    function setPricePerSecond(uint256 _pricePerSecond) external onlyOwner {
+        pricePerSecond = _pricePerSecond;
+    }
+
 
     /**
      * @dev See {IERC5643-renewSubscription}.
@@ -50,6 +83,30 @@ contract ERC5643 is ERC721URIStorage, IERC5643 {
         }
 
         _extendSubscription(tokenId, duration);
+    }
+
+    function setMinimumRenewalDuration(uint64 duration) external onlyOwner {
+        _setMinimumRenewalDuration(duration);
+    }
+
+    function setMaximumRenewalDuration(uint64 duration) external onlyOwner {
+        _setMaximumRenewalDuration(duration);
+    }
+
+    function setTokenURI(uint256 tokenId, string memory _uri) public {
+        require(_isApprovedOrOwner(msg.sender, tokenId) || _msgSender() == owner(), "Only token owner or contract owner can set URI");
+         if (!_exists(tokenId)) {
+            revert InvalidTokenId();
+        }
+        _setTokenURI(tokenId, _uri);
+    }
+
+    /**
+     *  This function returns who is authorized to set the owner of your contract.
+     *  Only allow the current owner to set the contract's new owner.
+     */
+    function _canSetOwner() internal virtual view override returns (bool) {
+        return msg.sender == owner();
     }
 
     /**
@@ -93,7 +150,9 @@ contract ERC5643 is ERC721URIStorage, IERC5643 {
         virtual
         returns (uint256)
     {
-        return 0;
+        uint256 price = duration * pricePerSecond;
+        
+        return duration >= 365 days ? price * (1000 - renewDiscount) / 1000  : price;
     }
 
     /**
@@ -166,6 +225,24 @@ contract ERC5643 is ERC721URIStorage, IERC5643 {
     function _setMaximumRenewalDuration(uint64 duration) internal virtual {
         maximumRenewalDuration = duration;
     }
+
+    /**
+     * @dev Returns whether `spender` is allowed to manage `tokenId`.
+     *
+     * Requirements:
+     *
+     * - `tokenId` must exist.
+     */
+    function _isApprovedOrOwner(address spender, uint256 tokenId) internal view virtual returns (bool) {
+        address owner = this.ownerOf(tokenId);
+        return (spender == owner || isApprovedForAll(owner, spender) || getApproved(tokenId) == spender);
+    }
+
+    // Disable token transfers
+    function _beforeTokenTransfers(address from, address to, uint256 startTokenId, uint256 quantity) internal virtual override {
+        require (from == address(0) || to == address(0), "You may not transfer your token!");
+    }
+
 
     /**
      * @dev See {IERC165-supportsInterface}.
