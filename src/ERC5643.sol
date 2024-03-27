@@ -6,6 +6,7 @@ import "@thirdweb-dev/contracts/extension/Ownable.sol";
 import "@thirdweb-dev/contracts/eip/ERC721A.sol";
 import "./IERC5643.sol";
 import {ERC721URIStorage} from "./ERC721URIStorage.sol";
+import "@thirdweb-dev/contracts/lib/Address.sol";
 
 error RenewalTooShort();
 error RenewalTooLong();
@@ -15,31 +16,54 @@ error InvalidTokenId();
 error CallerNotOwnerNorApproved();
 
 contract MoonDAOEntity is ERC721URIStorage, IERC5643, Ownable {
-    
-    
+
     // For example: targeted subscription = 0.5 eth / 365 days.
     // pricePerSecond = 5E17 wei / 31536000 (seconds in 365 days)
 
     // Roughly calculates to 0.1 (1E17 wei) ether per 365 days.
-    uint256 public pricePerSecond = 3150024690;
+    uint256 public pricePerSecond = 315002469;
 
     // Discount for renewal more than 12 months. Denominator is 1000.
     uint256 public renewDiscount = 200;
 
     mapping(uint256 => uint64) private _expirations;
 
+    mapping(uint256 => uint256) public entityTopHat;
+
+    address payable public moonDAOTreasury;
+
     uint64 internal minimumRenewalDuration;
     uint64 internal maximumRenewalDuration;
 
     mapping(uint256 => address) private _admin;
 
-    constructor(string memory name_, string memory symbol_)
+    constructor(string memory name_, string memory symbol_, address _treasury)
         ERC721A(name_, symbol_) 
     {
         _setupOwner(_msgSender());
+        moonDAOTreasury = payable(_treasury);
     }
 
-    function mintTo(address to, string calldata uri) external payable returns (uint256) {
+    function setTreasury(address _newTreasury) public onlyOwner {
+        moonDAOTreasury = payable(_newTreasury);
+    }
+
+    function mintTo(address to, string calldata uri, uint256 tophat, address orginalCaller) external payable returns (uint256) {
+        require (Address.isContract(to), "To has to be Safe Contract");
+
+        uint256 tokenId = _currentIndex;
+
+        _mint(to, 1);
+        _setTokenURI(tokenId, uri);
+        renewSubscription(tokenId, 365 days);
+        _admin[tokenId] = orginalCaller;
+
+        entityTopHat[tokenId] = tophat;
+
+        return tokenId;
+    }
+
+     function mintTo(address to, string calldata uri) external payable returns (uint256) {
 
         uint256 tokenId = _currentIndex;
 
@@ -50,6 +74,8 @@ contract MoonDAOEntity is ERC721URIStorage, IERC5643, Ownable {
 
         return tokenId;
     }
+
+
 
     /**
      * Allow owner to change the subscription price
@@ -84,6 +110,8 @@ contract MoonDAOEntity is ERC721URIStorage, IERC5643, Ownable {
             revert InsufficientPayment();
         }
 
+        moonDAOTreasury.transfer(msg.value);
+        
         _extendSubscription(tokenId, duration);
     }
 
@@ -206,8 +234,8 @@ contract MoonDAOEntity is ERC721URIStorage, IERC5643, Ownable {
             revert InvalidTokenId();
         }
 
-        if (_msgSender() != this.ownerOf(tokenId) || _msgSender() != _admin[tokenId]) {
-            revert("Not Admin or onwer");
+        if (_msgSender() != this.ownerOf(tokenId) && _msgSender() != _admin[tokenId]) {
+            revert("Not Admin or owner");
         }
         _admin[tokenId] = newAdmin;
     }

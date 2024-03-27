@@ -6,7 +6,7 @@ import "forge-std/Test.sol";
 import "../src/ERC5643.sol";
 import "../src/MoonDAOEntityCreator.sol";
 
-contract ERC5643Test is Test {
+contract CreatorTest is Test {
     event SubscriptionUpdate(uint256 indexed tokenId, uint64 expiration);
 
     address user1 = address(0x1);
@@ -23,8 +23,15 @@ contract ERC5643Test is Test {
         vm.deal(user1, 10 ether);
         vm.deal(user2, 10 ether);
 
-        erc5643 = new MoonDAOEntity("erc5369", "ERC5643");
+        erc5643 = new MoonDAOEntity("erc5369", "ERC5643", 0xF69ed83F805c0C271f1A7094d5092Dc0cAFa7008);
         creator = new MoonDAOEntityCreator(0x3bc1A0Ad72417f2d411118085256fC53CBdDd137, address(erc5643), 0xfb1bffC9d739B8D520DaF37dF666da4C687191EA, 0xC22834581EbC8527d974F8a1c97E1bEA4EF910BC);
     }
+
+    function testMint() public {
+         vm.prank(user1);
+         tokenId = creator.createMoonDAOEntity{value: 0.1 ether}(uri, uri);
+    }
+
+
 
 }

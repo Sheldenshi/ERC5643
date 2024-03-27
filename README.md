@@ -1,6 +1,7 @@
 ## Installation
 
 `git clone --recurse-submodules <repo-URL>`
+`git submodule update --init --recursive`
 
 ```sh
 forge install

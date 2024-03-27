@@ -21,9 +21,16 @@ contract ERC5643Test is Test {
         vm.deal(user1, 10 ether);
         vm.deal(user2, 10 ether);
 
-        erc5643 = new MoonDAOEntity("erc5369", "ERC5643");
+        erc5643 = new MoonDAOEntity("erc5369", "ERC5643", user3);
+
+        uint256 before = user3.balance;
+
         uint256 token1 = erc5643.mintTo{value: 0.1 ether}(user1, uri);
         assertEq(token1, tokenId);
+        
+        uint256 after_ = user3.balance;
+        
+        assertEq(after_ - before, 0.1 ether);
     }
 
     function testAdminSetURI() public {
@@ -31,6 +38,15 @@ contract ERC5643Test is Test {
         vm.prank(user3);
         uint256 tokenId = erc5643.mintTo{value: 0.1 ether}(user2, uri);
         vm.prank(user3);
+        erc5643.setTokenURI(tokenId, "https://reandom.com");
+        string memory tokenURI = erc5643.tokenURI(tokenId);
+        assertEq(tokenURI, "https://reandom.com");
+    }
+
+    function testSetAdmin() public {
+        vm.prank(user1);
+        erc5643.setAdmin(tokenId, user2);
+        vm.prank(user2);
         erc5643.setTokenURI(tokenId, "https://reandom.com");
         string memory tokenURI = erc5643.tokenURI(tokenId);
         assertEq(tokenURI, "https://reandom.com");
@@ -68,10 +84,11 @@ contract ERC5643Test is Test {
     }
 
     function testRenewalExistingSubscription() public {
+        uint256 currTime = block.timestamp;
         vm.warp(1000);
         vm.prank(user1);
         vm.expectEmit(true, true, false, true);
-        emit SubscriptionUpdate(tokenId, 365 days + 30 days + 1);
+        emit SubscriptionUpdate(tokenId, 31536000 + 30 days + 1 );
         erc5643.renewSubscription{value: 0.1 ether}(tokenId, 30 days);
         assertEq(user1.balance, 9.9 ether);
     }
@@ -103,12 +120,13 @@ contract ERC5643Test is Test {
     }
 
     function testExpiresAt() public {
+        uint256 currTime = block.timestamp;
         vm.warp(1000);
 
-        assertEq(erc5643.expiresAt(tokenId), 31536001);
+        assertEq(erc5643.expiresAt(tokenId), 31536001 + currTime - 1);
         vm.startPrank(user1);
         erc5643.renewSubscription{value: 0.1 ether}(tokenId, 2000);
-        assertEq(erc5643.expiresAt(tokenId), 31536001 + 2000 );
+        assertEq(erc5643.expiresAt(tokenId), 31536001 + 2000 + currTime - 1);
 
         erc5643.cancelSubscription(tokenId);
         assertEq(erc5643.expiresAt(tokenId), 0);
