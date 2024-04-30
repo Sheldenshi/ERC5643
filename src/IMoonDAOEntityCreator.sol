@@ -6,5 +6,5 @@ interface IMoonDAOEntityCreator {
 
     function createMoonDAOEntity(string calldata metaDataUri, string calldata hatsUri)
         external
-        payable returns (uint256);
+        payable returns (uint256, uint256);
 }

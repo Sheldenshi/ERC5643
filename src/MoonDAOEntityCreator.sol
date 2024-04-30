@@ -25,15 +25,20 @@ contract MoonDAOEntityCreator is IMoonDAOEntityCreator {
         gnosisSafeProxyFactory = GnosisSafeProxyFactory(_gnosisSafeProxyFactory);
     }
 
-    function createMoonDAOEntity(string calldata metaDataUri, string calldata hatsUri) external payable returns (uint256){
+    function createMoonDAOEntity(string calldata metaDataUri, string calldata hatsUri) external payable returns (uint256 tokenId, uint256 childHatId){
         bytes memory safeCallData = constructSafeCallData(msg.sender);
         GnosisSafeProxy gnosisSafe = gnosisSafeProxyFactory.createProxy(gnosisSingleton, safeCallData);
         
         //mint hat
-        uint256 hatId = hats.mintTopHat(address(gnosisSafe), hatsUri, "");
+        uint256 hatId = hats.mintTopHat(address(this), hatsUri, "");
 
-        uint256 tokenId = moonDAOEntity.mintTo{value: msg.value}(address(gnosisSafe), metaDataUri, hatId, msg.sender);
-        return tokenId;
+        childHatId = hats.createHat(hatId, "", 8, msg.sender, msg.sender, true, "");
+
+        hats.mintHat(childHatId, msg.sender);
+
+        hats.transferHat(hatId, address(this), address(gnosisSafe));
+
+        tokenId = moonDAOEntity.mintTo{value: msg.value}(address(gnosisSafe), metaDataUri, hatId);
 
     }
 
