@@ -10,3 +10,9 @@
 [submodule "lib/solady"]
 	path = lib/solady
 	url = https://github.com/vectorized/solady/
+[submodule "lib/evm-tableland"]
+	path = lib/evm-tableland
+	url = https://github.com/tablelandnetwork/evm-tableland
+[submodule "lib/openzeppelin"]
+	path = lib/openzeppelin
+	url = https://github.com/OpenZeppelin/openzeppelin-contracts
