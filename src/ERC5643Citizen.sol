@@ -7,6 +7,8 @@ import "@thirdweb-dev/contracts/eip/ERC721A.sol";
 import "./IERC5643.sol";
 import {ERC721URIStorage} from "./ERC721URIStorage.sol";
 import "@thirdweb-dev/contracts/lib/Address.sol";
+import "@evm-tableland/contracts/utils/URITemplate.sol";
+import {MoonDaoCitizenTableland} from "./tables/MoonDaoTableland.sol";
 
 error RenewalTooShort();
 error RenewalTooLong();
@@ -15,7 +17,7 @@ error SubscriptionNotRenewable();
 error InvalidTokenId();
 error CallerNotOwnerNorApproved();
 
-contract MoonDAOCitizen is ERC721URIStorage, IERC5643, Ownable {
+contract MoonDAOCitizen is ERC721URIStorage, URITemplate, IERC5643, Ownable {
 
     // For example: targeted subscription = 0.5 eth / 365 days.
     // pricePerSecond = 5E17 wei / 31536000 (seconds in 365 days)
@@ -26,37 +28,86 @@ contract MoonDAOCitizen is ERC721URIStorage, IERC5643, Ownable {
     // Discount for renewal more than 12 months. Denominator is 1000.
     uint256 public renewDiscount = 200;
 
-    mapping(uint256 => uint64) private _expirations;
+    string private _baseURIString = "https://testnets.tableland.network/api/v1/query?unwrap=true&extract=true&statement=";
 
+    mapping(uint256 => uint64) private _expirations;
 
     address payable public moonDAOTreasury;
 
     uint64 internal minimumRenewalDuration;
     uint64 internal maximumRenewalDuration;
 
+    MoonDaoCitizenTableland public table;
 
-    constructor(string memory name_, string memory symbol_, address _treasury)
+    
+    constructor(string memory name_, string memory symbol_, address _treasury, address _table)
         ERC721A(name_, symbol_) 
     {
         _setupOwner(_msgSender());
         moonDAOTreasury = payable(_treasury);
+        table = MoonDaoCitizenTableland(_table);
+
+        string memory uriTemplate = "SELECT+json_object%28%27id%27%2C+id%2C+%27name%27%2C+name%2C+%27description%27%2C+description%2C+%27image%27%2C+image%2C+%27attributes%27%2C+json_array%28json_object%28%27trait_type%27%2C+%27location%27%2C+%27value%27%2C+location%29%2C+json_object%28%27trait_type%27%2C+%27discord%27%2C+%27value%27%2C+discord%29%2C+json_object%28%27trait_type%27%2C+%27website%27%2C+%27value%27%2C+website%29%2C+json_object%28%27trait_type%27%2C+%27view%27%2C+%27value%27%2C+view%29%29%29+FROM+MOONDAO_CITIZEN_421614_723+WHERE+id%3D";
+		setURITemplate(uriTemplate);
+    }
+
+    function setTable(address _table) public onlyOwner {
+        table = MoonDaoCitizenTableland(_table);
+    }
+
+    function _baseURI() internal view override returns (string memory) {
+        return _baseURIString;
+    }
+
+    // Ensures the contract owner can easily update the project's baseURI
+    function setBaseURI(string memory baseURI) public onlyOwner {
+        _baseURIString = baseURI;
+    }
+
+    // method to set our uriTemplate
+    function setURITemplate(string memory uriTemplate)
+        public
+        onlyOwner
+    {
+        // create a size 1 array
+        string[] memory uriTemplates = new string[](1);
+        // set the first element to the uriTemplate
+        uriTemplates[0] = uriTemplate;
+        _setURITemplate(uriTemplates);
+    }
+
+    
+    // public method to read the tokenURI
+    function tokenURI(uint256 tokenId)
+        public
+        view
+        override(ERC721URIStorage)
+        returns (string memory)
+    {
+        if (!_exists(tokenId)) revert URIQueryForNonexistentToken();
+        string memory baseURI = _baseURI();
+        string memory _tokenURI = _getTokenURI(Strings.toString(tokenId));
+        return bytes(baseURI).length != 0 ? string(abi.encodePacked(baseURI, _tokenURI)) : "";
     }
 
     function setTreasury(address _newTreasury) public onlyOwner {
         moonDAOTreasury = payable(_newTreasury);
     }
 
-     function mintTo(address to, string calldata uri) external payable returns (uint256) {
+    function mintTo(address to, string memory name, string memory bio, string memory image, string memory location, string memory discord, string memory twitter, string memory website, string memory _view) external payable returns (uint256) {
+
+        //TODO
+        // require (Address.isContract(to), "To has to be Safe Contract");
 
         uint256 tokenId = _currentIndex;
 
         _mint(to, 1);
-        _setTokenURI(tokenId, uri);
         renewSubscription(tokenId, 365 days);
+
+        table.insertIntoTable(tokenId, name, bio, image, location, discord, twitter, website, _view);
 
         return tokenId;
     }
-
 
 
     /**
@@ -105,13 +156,21 @@ contract MoonDAOCitizen is ERC721URIStorage, IERC5643, Ownable {
         _setMaximumRenewalDuration(duration);
     }
 
-    function setTokenURI(uint256 tokenId, string memory _uri) public {
-        require(_isApprovedOrOwner(msg.sender, tokenId) || _msgSender() == owner(), "Only token owner or contract owner can set URI");
-         if (!_exists(tokenId)) {
-            revert InvalidTokenId();
-        }
-        _setTokenURI(tokenId, _uri);
-    }
+    // function setTokenURIOwner(uint256 tokenId, string memory _uri) public {
+    //     require(_isApprovedOrOwner(msg.sender, tokenId) || _msgSender() == owner(), "Only token owner or contract owner can set URI");
+    //      if (!_exists(tokenId)) {
+    //         revert InvalidTokenId();
+    //     }
+    //     _setTokenURI(tokenId, _uri);
+    // }
+
+    // function setTokenURIAdmin(uint256 tokenId, string memory _uri, uint256 _hatId) public {
+    //     require(hats.getHatEligibilityModule(_hatId) == msg.sender && hats.isAdminOfHat(ownerOf(tokenId), _hatId), "Caller has to wear a child of hat of token's topHat");
+    //     if (!_exists(tokenId)) {
+    //         revert InvalidTokenId();
+    //     }
+    //     _setTokenURI(tokenId, _uri);
+    // }
 
  
     /**
@@ -210,7 +269,6 @@ contract MoonDAOCitizen is ERC721URIStorage, IERC5643, Ownable {
         }
         return _isRenewable(tokenId);
     }
-
 
     /**
      * @dev Internal function to determine renewability. Implementing contracts

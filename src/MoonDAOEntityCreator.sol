@@ -7,8 +7,9 @@ import "@hats/Interfaces/IHats.sol";
 import "./IMoonDAOEntityCreator.sol";
 import "./GnosisSafeProxyFactory.sol";
 import "./GnosisSafeProxy.sol";
+import {MoonDaoEntityTableland} from "./tables/MoonDaoEntityTableland.sol";
 
-contract MoonDAOEntityCreator is IMoonDAOEntityCreator {
+contract MoonDAOEntityCreator {
 
     IHats internal hats;
 
@@ -18,14 +19,17 @@ contract MoonDAOEntityCreator is IMoonDAOEntityCreator {
 
     GnosisSafeProxyFactory internal gnosisSafeProxyFactory;
 
-    constructor(address _hats, address _moonDAOEntity, address _gnosisSingleton, address _gnosisSafeProxyFactory) {
+    MoonDaoEntityTableland public table;
+
+    constructor(address _hats, address _moonDAOEntity, address _gnosisSingleton, address _gnosisSafeProxyFactory, address _table) {
         hats = IHats(_hats);
         moonDAOEntity = MoonDAOEntity(_moonDAOEntity);
         gnosisSingleton = _gnosisSingleton;
         gnosisSafeProxyFactory = GnosisSafeProxyFactory(_gnosisSafeProxyFactory);
+        table = MoonDaoEntityTableland(_table);
     }
 
-    function createMoonDAOEntity(string calldata metaDataUri, string calldata hatsUri) external payable returns (uint256 tokenId, uint256 childHatId){
+    function createMoonDAOEntity(string calldata name, string calldata bio, string calldata image, string calldata twitter, string calldata communications, string calldata website, string calldata _view, string calldata hatsUri) external payable returns (uint256 tokenId, uint256 childHatId){
         bytes memory safeCallData = constructSafeCallData(msg.sender);
         GnosisSafeProxy gnosisSafe = gnosisSafeProxyFactory.createProxy(gnosisSingleton, safeCallData);
         
@@ -38,8 +42,9 @@ contract MoonDAOEntityCreator is IMoonDAOEntityCreator {
 
         hats.transferHat(hatId, address(this), address(gnosisSafe));
 
-        tokenId = moonDAOEntity.mintTo{value: msg.value}(address(gnosisSafe), metaDataUri, hatId);
+        tokenId = moonDAOEntity.mintTo{value: msg.value}(address(gnosisSafe), hatId);
 
+        table.insertIntoTable(tokenId, name, bio, image, twitter, communications, website, _view);
     }
 
     function constructSafeCallData(address caller) internal returns (bytes memory) {

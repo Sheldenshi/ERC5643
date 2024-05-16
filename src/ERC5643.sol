@@ -8,6 +8,7 @@ import "./IERC5643.sol";
 import {ERC721URIStorage} from "./ERC721URIStorage.sol";
 import "@thirdweb-dev/contracts/lib/Address.sol";
 import "@hats/Interfaces/IHats.sol";
+import "@evm-tableland/contracts/utils/URITemplate.sol";
 
 error RenewalTooShort();
 error RenewalTooLong();
@@ -16,7 +17,7 @@ error SubscriptionNotRenewable();
 error InvalidTokenId();
 error CallerNotOwnerNorApproved();
 
-contract MoonDAOEntity is ERC721URIStorage, IERC5643, Ownable {
+contract MoonDAOEntity is ERC721URIStorage, URITemplate, IERC5643, Ownable {
 
     // For example: targeted subscription = 0.5 eth / 365 days.
     // pricePerSecond = 5E17 wei / 31536000 (seconds in 365 days)
@@ -27,6 +28,8 @@ contract MoonDAOEntity is ERC721URIStorage, IERC5643, Ownable {
     // Discount for renewal more than 12 months. Denominator is 1000.
     uint256 public renewDiscount = 200;
 
+    string private _baseURIString = "https://testnets.tableland.network/api/v1/query?unwrap=true&extract=true&statement=";
+
     mapping(uint256 => uint64) private _expirations;
 
     mapping(uint256 => uint256) public entityTopHat;
@@ -36,7 +39,8 @@ contract MoonDAOEntity is ERC721URIStorage, IERC5643, Ownable {
     uint64 internal minimumRenewalDuration;
     uint64 internal maximumRenewalDuration;
 
-     IHats internal hats;
+    IHats internal hats;
+    
 
 
     constructor(string memory name_, string memory symbol_, address _treasury, address _hats)
@@ -45,19 +49,69 @@ contract MoonDAOEntity is ERC721URIStorage, IERC5643, Ownable {
         _setupOwner(_msgSender());
         moonDAOTreasury = payable(_treasury);
         hats = IHats(_hats);
+
+        string memory uriTemplate = "SELECT+json_object%28%27id%27%2C+id%2C+%27name%27%2C+name%2C+%27bio%27%2C+bio%2C+%27image%27%2C+image%2C+%27twitter%27%2C+twitter%2C+%27website%27%2C+website%2C+%27view%27%2C+view%29+FROM+MOONDAO_CITIZEN_421614_720+WHERE+id%3D";
+		setURITemplate(uriTemplate);
+    }
+
+    function _baseURI() internal view override returns (string memory) {
+        return _baseURIString;
+    }
+
+    // Ensures the contract owner can easily update the project's baseURI
+    function setBaseURI(string memory baseURI) public onlyOwner {
+        _baseURIString = baseURI;
+    }
+
+    // method to set our uriTemplate
+    function setURITemplate(string memory uriTemplate)
+        public
+        onlyOwner
+    {
+        // create a size 1 array
+        string[] memory uriTemplates = new string[](1);
+        // set the first element to the uriTemplate
+        uriTemplates[0] = uriTemplate;
+        _setURITemplate(uriTemplates);
+    }
+
+    // public method to read the tokenURI
+    function tokenURIT(uint256 tokenId)
+        public
+        view
+        returns (string memory, string memory)
+    {
+        if (!_exists(tokenId)) revert URIQueryForNonexistentToken();
+        string memory baseURI = _baseURI();
+        string memory _tokenURI = _getTokenURI(Strings.toString(tokenId));
+        return (_tokenURI, bytes(baseURI).length != 0 ? string(abi.encodePacked(baseURI, _tokenURI)) : "");
+    }
+    
+    // public method to read the tokenURI
+    function tokenURI(uint256 tokenId)
+        public
+        view
+        override(ERC721URIStorage)
+        returns (string memory)
+    {
+        if (!_exists(tokenId)) revert URIQueryForNonexistentToken();
+        string memory baseURI = _baseURI();
+        string memory _tokenURI = _getTokenURI(Strings.toString(tokenId));
+        return bytes(baseURI).length != 0 ? string(abi.encodePacked(baseURI, _tokenURI)) : "";
     }
 
     function setTreasury(address _newTreasury) public onlyOwner {
         moonDAOTreasury = payable(_newTreasury);
     }
 
-    function mintTo(address to, string calldata uri, uint256 tophat) external payable returns (uint256) {
-        require (Address.isContract(to), "To has to be Safe Contract");
+    function mintTo(address to, uint256 tophat) external payable returns (uint256) {
+
+        //TODO
+        // require (Address.isContract(to), "To has to be Safe Contract");
 
         uint256 tokenId = _currentIndex;
 
         _mint(to, 1);
-        _setTokenURI(tokenId, uri);
         renewSubscription(tokenId, 365 days);
 
         entityTopHat[tokenId] = tophat;
@@ -65,16 +119,16 @@ contract MoonDAOEntity is ERC721URIStorage, IERC5643, Ownable {
         return tokenId;
     }
 
-     function mintTo(address to, string calldata uri) external payable returns (uint256) {
+    //  function mintTo(address to, string calldata uri) external payable returns (uint256) {
 
-        uint256 tokenId = _currentIndex;
+    //     uint256 tokenId = _currentIndex;
 
-        _mint(to, 1);
-        _setTokenURI(tokenId, uri);
-        renewSubscription(tokenId, 365 days);
+    //     _mint(to, 1);
+    //     _setTokenURI(tokenId, uri);
+    //     renewSubscription(tokenId, 365 days);
 
-        return tokenId;
-    }
+    //     return tokenId;
+    // }
 
 
 
@@ -124,21 +178,21 @@ contract MoonDAOEntity is ERC721URIStorage, IERC5643, Ownable {
         _setMaximumRenewalDuration(duration);
     }
 
-    function setTokenURIOwner(uint256 tokenId, string memory _uri) public {
-        require(_isApprovedOrOwner(msg.sender, tokenId) || _msgSender() == owner(), "Only token owner or contract owner can set URI");
-         if (!_exists(tokenId)) {
-            revert InvalidTokenId();
-        }
-        _setTokenURI(tokenId, _uri);
-    }
+    // function setTokenURIOwner(uint256 tokenId, string memory _uri) public {
+    //     require(_isApprovedOrOwner(msg.sender, tokenId) || _msgSender() == owner(), "Only token owner or contract owner can set URI");
+    //      if (!_exists(tokenId)) {
+    //         revert InvalidTokenId();
+    //     }
+    //     _setTokenURI(tokenId, _uri);
+    // }
 
-    function setTokenURIAdmin(uint256 tokenId, string memory _uri, uint256 _hatId) public {
-        require(hats.getHatEligibilityModule(_hatId) == msg.sender && hats.isAdminOfHat(ownerOf(tokenId), _hatId), "Caller has to wear a child of hat of token's topHat");
-        if (!_exists(tokenId)) {
-            revert InvalidTokenId();
-        }
-        _setTokenURI(tokenId, _uri);
-    }
+    // function setTokenURIAdmin(uint256 tokenId, string memory _uri, uint256 _hatId) public {
+    //     require(hats.getHatEligibilityModule(_hatId) == msg.sender && hats.isAdminOfHat(ownerOf(tokenId), _hatId), "Caller has to wear a child of hat of token's topHat");
+    //     if (!_exists(tokenId)) {
+    //         revert InvalidTokenId();
+    //     }
+    //     _setTokenURI(tokenId, _uri);
+    // }
 
  
     /**
