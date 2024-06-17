@@ -9,6 +9,8 @@ import {ERC721URIStorage} from "./ERC721URIStorage.sol";
 import "@thirdweb-dev/contracts/lib/Address.sol";
 import "@evm-tableland/contracts/utils/URITemplate.sol";
 import {MoonDaoCitizenTableland} from "./tables/MoonDaoTableland.sol";
+import "@openzeppelin/contracts/access/extensions/AccessControlDefaultAdminRules.sol";
+import {Whitelist} from "./Whitelist.sol";
 
 error RenewalTooShort();
 error RenewalTooLong();
@@ -39,16 +41,36 @@ contract MoonDAOCitizen is ERC721URIStorage, URITemplate, IERC5643, Ownable {
 
     MoonDaoCitizenTableland public table;
 
+    bool public openAccess = false;
+
+    Whitelist private whitelist;
+
+    mapping(address => uint256) private owns;
+
+
+
     
-    constructor(string memory name_, string memory symbol_, address _treasury, address _table)
+    constructor(string memory name_, string memory symbol_, address _treasury, address _table, address _whitelist)
         ERC721A(name_, symbol_) 
     {
         _setupOwner(_msgSender());
         moonDAOTreasury = payable(_treasury);
         table = MoonDaoCitizenTableland(_table);
+        whitelist = Whitelist(_whitelist);
 
-        string memory uriTemplate = "SELECT+json_object%28%27id%27%2C+id%2C+%27name%27%2C+name%2C+%27description%27%2C+description%2C+%27image%27%2C+image%2C+%27attributes%27%2C+json_array%28json_object%28%27trait_type%27%2C+%27location%27%2C+%27value%27%2C+location%29%2C+json_object%28%27trait_type%27%2C+%27discord%27%2C+%27value%27%2C+discord%29%2C+json_object%28%27trait_type%27%2C+%27website%27%2C+%27value%27%2C+website%29%2C+json_object%28%27trait_type%27%2C+%27view%27%2C+%27value%27%2C+view%29%29%29+FROM+MOONDAO_CITIZEN_421614_723+WHERE+id%3D";
+        string memory uriTemplate = string.concat("SELECT+json_object%28%27id%27%2C+id%2C+%27name%27%2C+name%2C+%27description%27%2C+description%2C+%27image%27%2C+image%2C+%27attributes%27%2C+json_array%28json_object%28%27trait_type%27%2C+%27location%27%2C+%27value%27%2C+location%29%2C+json_object%28%27trait_type%27%2C+%27discord%27%2C+%27value%27%2C+discord%29%2C+json_object%28%27trait_type%27%2C+%27twitter%27%2C+%27value%27%2C+twitter%29%2C+json_object%28%27trait_type%27%2C+%27website%27%2C+%27value%27%2C+website%29%2C+json_object%28%27trait_type%27%2C+%27view%27%2C+%27value%27%2C+view%29%2C+json_object%28%27trait_type%27%2C+%27formId%27%2C+%27value%27%2C+formId%29%29%29+FROM+", table.getTableName(), "+WHERE+id%3D");
 		setURITemplate(uriTemplate);
+    }
+
+    function setOpenAccess(bool _openAccess) public onlyOwner {
+        openAccess = _openAccess;
+    }
+
+    function getOwnedToken(address _owner) public view returns (uint256) {
+        if (balanceOf(_owner) == 0) {
+            revert("No token owned");
+        }
+        return owns[_owner];
     }
 
     function setTable(address _table) public onlyOwner {
@@ -94,17 +116,18 @@ contract MoonDAOCitizen is ERC721URIStorage, URITemplate, IERC5643, Ownable {
         moonDAOTreasury = payable(_newTreasury);
     }
 
-    function mintTo(address to, string memory name, string memory bio, string memory image, string memory location, string memory discord, string memory twitter, string memory website, string memory _view) external payable returns (uint256) {
+    function mintTo(address to, string memory name, string memory bio, string memory image, string memory location, string memory discord, string memory twitter, string memory website, string memory _view, string memory formId) external payable returns (uint256) {
 
-        //TODO
-        // require (Address.isContract(to), "To has to be Safe Contract");
+        if (!openAccess) {
+            require(whitelist.isWhitelisted(msg.sender), "Caller is not whitelisted");
+        }
 
         uint256 tokenId = _currentIndex;
 
         _mint(to, 1);
         renewSubscription(tokenId, 365 days);
 
-        table.insertIntoTable(tokenId, name, bio, image, location, discord, twitter, website, _view);
+        table.insertIntoTable(tokenId, name, bio, image, location, discord, twitter, website, _view, formId, to);
 
         return tokenId;
     }
@@ -312,7 +335,17 @@ contract MoonDAOCitizen is ERC721URIStorage, URITemplate, IERC5643, Ownable {
 
     // Disable token transfers
     function _beforeTokenTransfers(address from, address to, uint256 startTokenId, uint256 quantity) internal virtual override {
+        require(quantity == 1, "Only one token may be transferred at a time!");
         require (from == address(0) || to == address(0), "You may not transfer your token!");
+        require (balanceOf(to) == 0, "Each address may only hold one token!");
+    }
+
+    function _afterTokenTransfers(address from, address to, uint256 startTokenId, uint256 quantity) internal virtual override {
+        if (from == address(0)) {
+            owns[to] = startTokenId;
+            return;
+        }
+        table.updateTableCol("owner", Strings.toHexString(to), from);
     }
 
 

@@ -5,25 +5,26 @@ import {SQLHelpers} from "@evm-tableland/contracts/utils/SQLHelpers.sol";
 import {TablelandController} from "@evm-tableland/contracts/TablelandController.sol";
 import {TablelandPolicy} from "@evm-tableland/contracts/TablelandPolicy.sol";
 import {Policies} from "@evm-tableland/contracts/policies/Policies.sol";
-import {MoonDAOCitizen} from "../ERC5643Citizen.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+// import {MoonDAOCitizen} from "../ERC5643Citizen.sol";
 
-contract CitizenRowController is TablelandController {
-  address[] private _tableOwners;
-  MoonDAOCitizen private _citizenERC5643;
+contract CitizenRowController is TablelandController, Ownable {
+  address[] public _tableOwners;
+//   MoonDAOCitizen private _citizenERC5643;
 
     // Set the table owner during contract deployment
-    constructor(address tableOwner, address citizenERC5643) {
+    constructor(address tableOwner) Ownable(msg.sender) {
         _tableOwners.push(tableOwner);
-        _citizen = MoonDAOCitizen(citizenERC5643);
+        // _citizenERC5643 = MoonDAOCitizen(citizenERC5643);
     }
 
     // add a new table owner
-    function addTableOwner(address tableOwner) public {
+    function addTableOwner(address tableOwner) public onlyOwner {
         _tableOwners.push(tableOwner);
     }
 
     // remove a table owner
-    function removeTableOwner(address tableOwner) public {
+    function removeTableOwner(address tableOwner) public onlyOwner {
         for (uint256 i = 0; i < _tableOwners.length; i++) {
             if (tableOwner == _tableOwners[i]) {
                 _tableOwners[i] = _tableOwners[_tableOwners.length - 1];
@@ -33,7 +34,7 @@ contract CitizenRowController is TablelandController {
         }
     }
 
-    function isTableOnwer(address caller) internal view returns (bool) {
+    function isTableOnwer(address caller) public view returns (bool) {
         // Ensure the caller is the table owner
         bool isTableOwner = false;
         for (uint256 i = 0; i < _tableOwners.length; i++) {
@@ -49,44 +50,6 @@ contract CitizenRowController is TablelandController {
         address caller,
         uint256
     ) public payable override returns (TablelandPolicy memory) {
-  // Set the table owner during contract deployment
-    constructor(address tableOwner) {
-        _tableOwners.push(tableOwner);
-    }
-
-    // add a new table owner
-    function addTableOwner(address tableOwner) public {
-        _tableOwners.push(tableOwner);
-    }
-
-    // remove a table owner
-    function removeTableOwner(address tableOwner) public {
-        for (uint256 i = 0; i < _tableOwners.length; i++) {
-            if (tableOwner == _tableOwners[i]) {
-                _tableOwners[i] = _tableOwners[_tableOwners.length - 1];
-                _tableOwners.pop();
-                break;
-            }
-        }
-    }
-
-    function isTableOnwer(address caller) internal view returns (bool) {
-        // Ensure the caller is the table owner
-        bool isTableOwner = false;
-        for (uint256 i = 0; i < _tableOwners.length; i++) {
-            if (caller == _tableOwners[i]) {
-                isTableOwner = true;
-                break;
-            }
-        }
-        return isTableOwner;
-    }
-
-    function getPolicy(
-        address caller,
-        uint256
-    ) public payable override returns (TablelandPolicy memory) {
-
 
         // Return allow-all policy if the caller is the owner—our `Example` contract
         if (isTableOnwer(caller)) {
@@ -109,9 +72,19 @@ contract CitizenRowController is TablelandController {
             SQLHelpers.quote(Strings.toHexString(caller))
         );
 
-        // Restrict updates to a single `val` column
-        string[] memory updatableColumns = new string[](1);
-        updatableColumns[0] = "metadata";
+
+        string[] memory updatableColumns = new string[](9);
+        // string[9] memory updatableColumns = ["name", "description", "image", "location", "discord", "twitter", "website", "view", "formId", "owner"];
+        updatableColumns[0] = "name";
+        updatableColumns[1] = "description";
+        updatableColumns[2] = "image";
+        updatableColumns[3] = "location";
+        updatableColumns[4] = "discord";
+        updatableColumns[5] = "twitter";
+        updatableColumns[6] = "website";
+        updatableColumns[7] = "view";
+        updatableColumns[8] = "formId";
+        updatableColumns[9] = "owner";
 
         // Now, return the policy that gates by the WHERE clause & updatable columns
         return

@@ -25,7 +25,7 @@ contract ERC5643Test is Test {
 
         uint256 before = user3.balance;
 
-        uint256 token1 = erc5643.mintTo{value: 0.1 ether}(user1, 123456);
+        uint256 token1 = erc5643.mintTo{value: 0.1 ether}(user1, 123456, 123456);
         assertEq(token1, tokenId);
         
         uint256 after_ = user3.balance;
@@ -90,7 +90,7 @@ contract ERC5643Test is Test {
         vm.prank(user2);
         vm.expectEmit(true, true, false, true);
         emit SubscriptionUpdate(tokenId2, 365 days + 1000);
-        erc5643.mintTo{value: 0.1 ether}(user2, 123456);
+        erc5643.mintTo{value: 0.1 ether}(user2, 123456, 123456);
 
         // This renewal will succeed because the subscription is renewable
         vm.prank(user2);
@@ -145,7 +145,7 @@ contract ERC5643Test is Test {
 
         vm.expectEmit(true, true, false, true);
         emit SubscriptionUpdate(tokenId2, 365 days + 1000);
-        uint256 id = erc5643.mintTo{value: 1 ether}(user2, 123456);
+        uint256 id = erc5643.mintTo{value: 1 ether}(user2, 123456, 123456);
         assertEq(erc5643.expiresAt(tokenId2), 365 days + 1000);
 
         vm.deal(user2, 1 ether);

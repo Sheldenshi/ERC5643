@@ -5,12 +5,27 @@ import {SQLHelpers} from "@evm-tableland/contracts/utils/SQLHelpers.sol";
 import {TablelandController} from "@evm-tableland/contracts/TablelandController.sol";
 import {TablelandPolicy} from "@evm-tableland/contracts/TablelandPolicy.sol";
 import {Policies} from "@evm-tableland/contracts/policies/Policies.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
-contract RowController is TablelandController {
+contract EntityRowController is TablelandController, Ownable {
   address[] private _tableOwners;
   // Set the table owner during contract deployment
-    constructor(address tableOwner) {
+    constructor(address tableOwner) Ownable(msg.sender) {
         _tableOwners.push(tableOwner);
+    }
+
+    function addTableOwner(address tableOwner) public onlyOwner {
+        _tableOwners.push(tableOwner);
+    }
+
+    function removeTableOwner(address tableOwner) public onlyOwner {
+        for (uint256 i = 0; i < _tableOwners.length; i++) {
+            if (tableOwner == _tableOwners[i]) {
+                _tableOwners[i] = _tableOwners[_tableOwners.length - 1];
+                _tableOwners.pop();
+                break;
+            }
+        }
     }
 
     function isTableOnwer(address caller) internal view returns (bool) {

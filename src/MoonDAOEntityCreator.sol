@@ -8,8 +8,10 @@ import "./IMoonDAOEntityCreator.sol";
 import "./GnosisSafeProxyFactory.sol";
 import "./GnosisSafeProxy.sol";
 import {MoonDaoEntityTableland} from "./tables/MoonDaoEntityTableland.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {Whitelist} from "./WhiteList.sol";
 
-contract MoonDAOEntityCreator {
+contract MoonDAOEntityCreator is Ownable {
 
     IHats internal hats;
 
@@ -21,30 +23,50 @@ contract MoonDAOEntityCreator {
 
     MoonDaoEntityTableland public table;
 
-    constructor(address _hats, address _moonDAOEntity, address _gnosisSingleton, address _gnosisSafeProxyFactory, address _table) {
+    uint256 public MoonDaoEntityEdminHatId;
+
+    Whitelist internal whitelist;
+
+    bool public openAccess;
+
+    constructor(address _hats, address _moonDAOEntity, address _gnosisSingleton, address _gnosisSafeProxyFactory, address _table, address _whitelist) Ownable(msg.sender) {
         hats = IHats(_hats);
         moonDAOEntity = MoonDAOEntity(_moonDAOEntity);
         gnosisSingleton = _gnosisSingleton;
         gnosisSafeProxyFactory = GnosisSafeProxyFactory(_gnosisSafeProxyFactory);
         table = MoonDaoEntityTableland(_table);
+        whitelist = Whitelist(_whitelist);
     }
 
-    function createMoonDAOEntity(string calldata name, string calldata bio, string calldata image, string calldata twitter, string calldata communications, string calldata website, string calldata _view, string calldata hatsUri) external payable returns (uint256 tokenId, uint256 childHatId){
+    function setMoonDaoEntityEdminHatId(uint256 _MoonDaoEntityEdminHatId) external onlyOwner() {
+        MoonDaoEntityEdminHatId = _MoonDaoEntityEdminHatId;
+    }
+
+    function setOpenAccess(bool _openAccess) external onlyOwner() {
+        openAccess = _openAccess;
+    }
+
+    function createMoonDAOEntity(string memory adminHatURI, string memory managerHatURI, string calldata name, string calldata bio, string calldata image, string calldata twitter, string calldata communications, string calldata website, string calldata _view, string memory formId) external payable returns (uint256 tokenId, uint256 childHatId) {
+
+        require(whitelist.isWhitelisted(msg.sender) || openAccess, "Only whitelisted addresses can create MoonDAOEntity");
+        
+
         bytes memory safeCallData = constructSafeCallData(msg.sender);
         GnosisSafeProxy gnosisSafe = gnosisSafeProxyFactory.createProxy(gnosisSingleton, safeCallData);
         
         //mint hat
-        uint256 hatId = hats.mintTopHat(address(this), hatsUri, "");
+        uint256 entityAdminHat = hats.createHat(MoonDaoEntityEdminHatId, adminHatURI, 1, address(gnosisSafe), address(gnosisSafe), true, "");
+        hats.mintHat(entityAdminHat, address(this));
 
-        childHatId = hats.createHat(hatId, "", 8, msg.sender, msg.sender, true, "");
+        uint256 entityManagerHat = hats.createHat(entityAdminHat, managerHatURI, 8, msg.sender, msg.sender, true, "");
 
-        hats.mintHat(childHatId, msg.sender);
+        hats.mintHat(entityManagerHat, msg.sender);
 
-        hats.transferHat(hatId, address(this), address(gnosisSafe));
+        hats.transferHat(entityAdminHat, address(this), address(gnosisSafe));
 
-        tokenId = moonDAOEntity.mintTo{value: msg.value}(address(gnosisSafe), hatId);
+        tokenId = moonDAOEntity.mintTo{value: msg.value}(address(gnosisSafe), entityAdminHat, entityManagerHat);
 
-        table.insertIntoTable(tokenId, name, bio, image, twitter, communications, website, _view);
+        table.insertIntoTable(tokenId, name, bio, image, twitter, communications, website, _view, formId);
     }
 
     function constructSafeCallData(address caller) internal returns (bytes memory) {

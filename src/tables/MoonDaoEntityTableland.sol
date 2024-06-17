@@ -5,10 +5,12 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {TablelandDeployments} from "@evm-tableland/contracts/utils/TablelandDeployments.sol";
 import {SQLHelpers} from "@evm-tableland/contracts/utils/SQLHelpers.sol";
 import {ERC721Holder} from "@openzeppelin/contracts/token/ERC721/utils/ERC721Holder.sol";
+import {MoonDAOEntity} from "../ERC5643.sol";
 
 contract MoonDaoEntityTableland is ERC721Holder, Ownable {
     uint256 private _tableId;
     string private _TABLE_PREFIX;
+    MoonDAOEntity public _moonDaoEntity;
 
     constructor(string memory _table_prefix) Ownable(msg.sender) {
         _TABLE_PREFIX = _table_prefix;
@@ -22,14 +24,19 @@ contract MoonDaoEntityTableland is ERC721Holder, Ownable {
                 "twitter text,"
                 "communications text,"
                 "website text,"
-                "view text",
+                "view text,"
+                "formId text",
                 _TABLE_PREFIX
             )
         );
     }
 
+    function setMoonDaoEntity(address moonDaoEntity) external onlyOwner{
+        _moonDaoEntity = MoonDAOEntity(moonDaoEntity);
+    }
+
     // Let anyone insert into the table
-    function insertIntoTable(uint256 id, string memory name, string memory description, string memory image, string memory twitter, string memory communications, string memory website, string memory _view) external {
+    function insertIntoTable(uint256 id, string memory name, string memory description, string memory image, string memory twitter, string memory communications, string memory website, string memory _view, string memory formId) external {
         string memory setters = string.concat(
             string.concat(
                 Strings.toString(id), // Convert to a string
@@ -47,7 +54,9 @@ contract MoonDaoEntityTableland is ERC721Holder, Ownable {
             ",",
             SQLHelpers.quote(website), // Wrap strings in single quotes with the `quote` method
             ",",
-            SQLHelpers.quote(_view) // Wrap strings in single quotes with the `quote` method
+            SQLHelpers.quote(_view), // Wrap strings in single quotes with the `quote` method,
+            ",",
+            SQLHelpers.quote(formId) // Wrap strings in single quotes with the `quote` method
         );
         TablelandDeployments.get().mutate(
             address(this), // Table owner, i.e., this contract
@@ -55,13 +64,16 @@ contract MoonDaoEntityTableland is ERC721Holder, Ownable {
             SQLHelpers.toInsert(
                 _TABLE_PREFIX,
                 _tableId,
-                "id,name,description,image,twitter,communications,website,view",
+                "id,name,description,image,twitter,communications,website,view,formId",
                 setters
             )
         );
     }
 
-    function updateTable(uint256 id, string memory name, string memory description, string memory image, string memory twitter,string memory communications, string memory website, string memory _view) external {
+    function updateTable(uint256 id, string memory name, string memory description, string memory image, string memory twitter,string memory communications, string memory website, string memory _view, string memory formId) external {
+        
+        require (_moonDaoEntity.isManager(id, msg.sender) || owner() == msg.sender, "Only Admin can update");
+
         // Set the values to update
         string memory setters = string.concat(
             "name=",
@@ -77,7 +89,9 @@ contract MoonDaoEntityTableland is ERC721Holder, Ownable {
             ",website=",
             SQLHelpers.quote(website),
             ",view=",
-            SQLHelpers.quote(_view)
+            SQLHelpers.quote(_view),
+            ",formId=",
+            SQLHelpers.quote(formId)
         );
         // Specify filters for which row to update
         string memory filters = string.concat(
@@ -94,8 +108,10 @@ contract MoonDaoEntityTableland is ERC721Holder, Ownable {
 
     // Update only the row that the caller inserted
     function updateTableCol(uint256 id, string memory colName, string memory val) external {
+        require (_moonDaoEntity.isManager(id, msg.sender) || owner() == msg.sender, "Only Admin can update");
+
         // Set the values to update
-        string memory setters = string.concat(colName, SQLHelpers.quote(val));
+        string memory setters = string.concat(colName, "=", SQLHelpers.quote(val));
         // Specify filters for which row to update
         string memory filters = string.concat(
             "id=",
@@ -112,6 +128,8 @@ contract MoonDaoEntityTableland is ERC721Holder, Ownable {
 
     // Delete a row from the table by ID 
     function deleteFromTable(uint256 id) external {
+        require (_moonDaoEntity.isManager(id, msg.sender) || owner() == msg.sender, "Only Admin can update");
+
         // Specify filters for which row to delete
         string memory filters = string.concat(
             "id=",
