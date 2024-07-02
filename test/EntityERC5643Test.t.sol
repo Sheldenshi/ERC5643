@@ -4,6 +4,7 @@ pragma solidity ^0.8.13;
 
 import "forge-std/Test.sol";
 import "../src/ERC5643.sol";
+import {Whitelist} from "../src/Whitelist.sol";
 
 contract ERC5643Test is Test {
     event SubscriptionUpdate(uint256 indexed tokenId, uint64 expiration);
@@ -15,17 +16,19 @@ contract ERC5643Test is Test {
     uint256 tokenId2 = 1;
     uint256 tokenId3= 2;
     string uri = "https://test.com";
-    MoonDAOEntity erc5643;
+    MoonDAOTeam erc5643;
 
     function setUp() public {
         vm.deal(user1, 10 ether);
         vm.deal(user2, 10 ether);
 
-        erc5643 = new MoonDAOEntity("erc5369", "ERC5643", user3, 0x3bc1A0Ad72417f2d411118085256fC53CBdDd137);
+        Whitelist discountList = new Whitelist();
+
+        erc5643 = new MoonDAOTeam("erc5369", "ERC5643", user3, 0x3bc1A0Ad72417f2d411118085256fC53CBdDd137, address(discountList));
 
         uint256 before = user3.balance;
 
-        uint256 token1 = erc5643.mintTo{value: 0.1 ether}(user1, 123456, 123456);
+        uint256 token1 = erc5643.mintTo{value: 0.1 ether}(user1, 123456, 123456, address(0));
         assertEq(token1, tokenId);
         
         uint256 after_ = user3.balance;
@@ -90,7 +93,7 @@ contract ERC5643Test is Test {
         vm.prank(user2);
         vm.expectEmit(true, true, false, true);
         emit SubscriptionUpdate(tokenId2, 365 days + 1000);
-        erc5643.mintTo{value: 0.1 ether}(user2, 123456, 123456);
+        erc5643.mintTo{value: 0.1 ether}(user2, 123456, 123456, address(0));
 
         // This renewal will succeed because the subscription is renewable
         vm.prank(user2);
@@ -145,7 +148,7 @@ contract ERC5643Test is Test {
 
         vm.expectEmit(true, true, false, true);
         emit SubscriptionUpdate(tokenId2, 365 days + 1000);
-        uint256 id = erc5643.mintTo{value: 1 ether}(user2, 123456, 123456);
+        uint256 id = erc5643.mintTo{value: 1 ether}(user2, 123456, 123456, address(0));
         assertEq(erc5643.expiresAt(tokenId2), 365 days + 1000);
 
         vm.deal(user2, 1 ether);

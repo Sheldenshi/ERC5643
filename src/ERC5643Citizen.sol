@@ -25,10 +25,10 @@ contract MoonDAOCitizen is ERC721URIStorage, URITemplate, IERC5643, Ownable {
     // pricePerSecond = 5E17 wei / 31536000 (seconds in 365 days)
 
     // Roughly calculates to 0.1 (1E17 wei) ether per 365 days.
-    uint256 public pricePerSecond = 315002469;
+    uint256 public pricePerSecond = 31500246;
 
-    // Discount for renewal more than 12 months. Denominator is 1000.
-    uint256 public renewDiscount = 200;
+
+    uint256 public discount = 200;
 
     string private _baseURIString = "https://testnets.tableland.network/api/v1/query?unwrap=true&extract=true&statement=";
 
@@ -45,21 +45,32 @@ contract MoonDAOCitizen is ERC721URIStorage, URITemplate, IERC5643, Ownable {
 
     Whitelist private whitelist;
 
+    Whitelist private discountList;
+
     mapping(address => uint256) private owns;
 
 
 
     
-    constructor(string memory name_, string memory symbol_, address _treasury, address _table, address _whitelist)
+    constructor(string memory name_, string memory symbol_, address _treasury, address _table, address _whitelist, address _discountList)
         ERC721A(name_, symbol_) 
     {
         _setupOwner(_msgSender());
         moonDAOTreasury = payable(_treasury);
         table = MoonDaoCitizenTableland(_table);
         whitelist = Whitelist(_whitelist);
+        discountList = Whitelist(_discountList);
 
         string memory uriTemplate = string.concat("SELECT+json_object%28%27id%27%2C+id%2C+%27name%27%2C+name%2C+%27description%27%2C+description%2C+%27image%27%2C+image%2C+%27attributes%27%2C+json_array%28json_object%28%27trait_type%27%2C+%27location%27%2C+%27value%27%2C+location%29%2C+json_object%28%27trait_type%27%2C+%27discord%27%2C+%27value%27%2C+discord%29%2C+json_object%28%27trait_type%27%2C+%27twitter%27%2C+%27value%27%2C+twitter%29%2C+json_object%28%27trait_type%27%2C+%27website%27%2C+%27value%27%2C+website%29%2C+json_object%28%27trait_type%27%2C+%27view%27%2C+%27value%27%2C+view%29%2C+json_object%28%27trait_type%27%2C+%27formId%27%2C+%27value%27%2C+formId%29%29%29+FROM+", table.getTableName(), "+WHERE+id%3D");
 		setURITemplate(uriTemplate);
+    }
+
+    function setWhitelist(address _whitelist) public onlyOwner {
+        whitelist = Whitelist(_whitelist);
+    }
+
+    function setDiscountList(address _discountList) public onlyOwner {
+        discountList = Whitelist(_discountList);
     }
 
     function setOpenAccess(bool _openAccess) public onlyOwner {
@@ -246,8 +257,13 @@ contract MoonDAOCitizen is ERC721URIStorage, URITemplate, IERC5643, Ownable {
         returns (uint256)
     {
         uint256 price = duration * pricePerSecond;
-        
-        return duration >= 365 days ? price * (1000 - renewDiscount) / 1000  : price;
+        address owner = this.ownerOf(tokenId);
+        return discountList.isWhitelisted(owner) ? price * (1000 - discount) / 1000  : price;
+    }
+
+    function getRenewalPrice(address owner, uint64 duration) public view returns (uint256) {
+        uint256 price = duration * pricePerSecond;
+        return discountList.isWhitelisted(owner) ? price * (1000 - discount) / 1000  : price;
     }
 
     /**
