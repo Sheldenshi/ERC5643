@@ -3,11 +3,11 @@
 pragma solidity ^0.8.20;
 
 import "forge-std/Script.sol";
-import {MoonDaoEntityTableland} from "../src/tables/MoonDaoEntityTableland.sol";
+import {MoonDaoTeamTableland} from "../src/tables/MoonDaoTeamTableland.sol";
 // import "../src/ERC5643.sol";
-import {MoonDAOEntityCreator} from "../src/MoonDAOEntityCreator.sol";
+import {MoonDAOTeamCreator} from "../src/MoonDAOTeamCreator.sol";
 import {IHats} from "@hats/Interfaces/IHats.sol";
-import {MoonDAOEntity} from "../src/ERC5643.sol";
+import {MoonDAOTeam} from "../src/ERC5643.sol";
 import {Whitelist} from "../src/Whitelist.sol";
 
 
@@ -17,28 +17,35 @@ contract MyScript is Script {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         vm.startBroadcast(deployerPrivateKey);
 
+        address TREASURY = 0xAF26a002d716508b7e375f1f620338442F5470c0;
+
         Whitelist whitelist = new Whitelist();
+
+        Whitelist discountList = new Whitelist();
 
         IHats hats = IHats(0x3bc1A0Ad72417f2d411118085256fC53CBdDd137);
 
         // uint256 topHatId = hats.mintTopHat(msg.sender, "", "");
 
-        uint256 moonDaoEntityEdminHatId = hats.createHat(8384543413483848976141441692063105139501151915410118041623222787506176, "", 1, 0x09224bC4a1Ea9ce55E953bFab083A055eC4d19B7, 0x09224bC4a1Ea9ce55E953bFab083A055eC4d19B7, true, "");
+        uint256 moonDaoTeamEdminHatId = hats.createHat(700958613345916634661342392262510397514565754986054884508693866479616, "", 1, 0xd1916F254866E4e70abA86F0dD668DD5942E032a, 0xd1916F254866E4e70abA86F0dD668DD5942E032a, true, "");
 
-        MoonDAOEntity entity = new MoonDAOEntity("MoonDaoEntity", "MDE", 0x09224bC4a1Ea9ce55E953bFab083A055eC4d19B7, 0x3bc1A0Ad72417f2d411118085256fC53CBdDd137);
+        MoonDAOTeam team = new MoonDAOTeam("MoonDaoTeam", "MDE", TREASURY, 0x3bc1A0Ad72417f2d411118085256fC53CBdDd137, address(discountList));
 
-        MoonDaoEntityTableland entityTable  = new MoonDaoEntityTableland("ENTITYTABLE");
+        MoonDaoTeamTableland teamTable  = new MoonDaoTeamTableland("ENTITYTABLE");
 
-        entityTable.setMoonDaoEntity(address(entity));
+        teamTable.setMoonDaoTeam(address(team));
 
-        MoonDAOEntityCreator creator = new MoonDAOEntityCreator(0x3bc1A0Ad72417f2d411118085256fC53CBdDd137, address(entity), 0xfb1bffC9d739B8D520DaF37dF666da4C687191EA, 0xC22834581EbC8527d974F8a1c97E1bEA4EF910BC, address(entityTable), address(whitelist));
+        MoonDAOTeamCreator creator = new MoonDAOTeamCreator(0x3bc1A0Ad72417f2d411118085256fC53CBdDd137, address(team), 0xfb1bffC9d739B8D520DaF37dF666da4C687191EA, 0xC22834581EbC8527d974F8a1c97E1bEA4EF910BC, address(teamTable), address(whitelist));
 
         creator.setOpenAccess(true);
 
-        creator.setMoonDaoEntityEdminHatId(moonDaoEntityEdminHatId);
+        creator.setMoonDaoTeamEdminHatId(moonDaoTeamEdminHatId);
 
-        hats.mintHat(moonDaoEntityEdminHatId, address(creator));
-        hats.changeHatEligibility(moonDaoEntityEdminHatId, address(creator));
+        hats.mintHat(moonDaoTeamEdminHatId, address(creator));
+        hats.changeHatEligibility(moonDaoTeamEdminHatId, address(creator));
+
+        string memory uriTemplate = string.concat("SELECT+json_object%28%27id%27%2C+id%2C+%27name%27%2C+name%2C+%27description%27%2C+description%2C+%27image%27%2C+image%2C+%27attributes%27%2C+json_array%28json_object%28%27trait_type%27%2C+%27twitter%27%2C+%27value%27%2C+twitter%29%2C+json_object%28%27trait_type%27%2C+%27communications%27%2C+%27value%27%2C+communications%29%2C+json_object%28%27trait_type%27%2C+%27website%27%2C+%27value%27%2C+website%29%2C+json_object%28%27trait_type%27%2C+%27view%27%2C+%27value%27%2C+view%29%2C+json_object%28%27trait_type%27%2C+%27formId%27%2C+%27value%27%2C+formId%29%29%29+FROM+",teamTable.getTableName(),"+WHERE+id%3D");
+		team.setURITemplate(uriTemplate);
 
         vm.stopBroadcast();
     }

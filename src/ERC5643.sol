@@ -9,6 +9,7 @@ import {ERC721URIStorage} from "./ERC721URIStorage.sol";
 import "@thirdweb-dev/contracts/lib/Address.sol";
 import "@hats/Interfaces/IHats.sol";
 import "@evm-tableland/contracts/utils/URITemplate.sol";
+import {Whitelist} from "./Whitelist.sol";
 
 error RenewalTooShort();
 error RenewalTooLong();
@@ -17,25 +18,26 @@ error SubscriptionNotRenewable();
 error InvalidTokenId();
 error CallerNotOwnerNorApproved();
 
-contract MoonDAOEntity is ERC721URIStorage, URITemplate, IERC5643, Ownable {
+contract MoonDAOTeam is ERC721URIStorage, URITemplate, IERC5643, Ownable {
 
     // For example: targeted subscription = 0.5 eth / 365 days.
     // pricePerSecond = 5E17 wei / 31536000 (seconds in 365 days)
 
     // Roughly calculates to 0.1 (1E17 wei) ether per 365 days.
-    uint256 public pricePerSecond = 315002469;
+    uint256 public pricePerSecond = 31500246;
 
     // Discount for renewal more than 12 months. Denominator is 1000.
-    uint256 public renewDiscount = 200;
+    uint256 public discount = 200;
 
     string private _baseURIString = "https://testnets.tableland.network/api/v1/query?unwrap=true&extract=true&statement=";
 
     mapping(uint256 => uint64) private _expirations;
 
-    mapping(uint256 => uint256) public entityAdminHat;
+    mapping(uint256 => uint256) public teamAdminHat;
 
-    mapping(uint256 => uint256) public entityManagerHat;
+    mapping(uint256 => uint256) public teamManagerHat;
 
+    mapping(uint256 => address) public splitContract;
 
     address payable public moonDAOTreasury;
 
@@ -43,16 +45,20 @@ contract MoonDAOEntity is ERC721URIStorage, URITemplate, IERC5643, Ownable {
     uint64 internal maximumRenewalDuration;
 
     IHats internal hats;
+
+    Whitelist private discountList;
     
-    constructor(string memory name_, string memory symbol_, address _treasury, address _hats)
+    constructor(string memory name_, string memory symbol_, address _treasury, address _hats, address _discountList)
         ERC721A(name_, symbol_) 
     {
         _setupOwner(_msgSender());
         moonDAOTreasury = payable(_treasury);
         hats = IHats(_hats);
+        discountList = Whitelist(_discountList);
+    }
 
-        string memory uriTemplate = "SELECT+json_object%28%27id%27%2C+id%2C+%27name%27%2C+name%2C+%27bio%27%2C+bio%2C+%27image%27%2C+image%2C+%27twitter%27%2C+twitter%2C+%27website%27%2C+website%2C+%27view%27%2C+view%29+FROM+MOONDAO_CITIZEN_421614_720+WHERE+id%3D";
-		setURITemplate(uriTemplate);
+    function setDiscountList(address _discountList) public onlyOwner {
+        discountList = Whitelist(_discountList);
     }
 
     function _baseURI() internal view override returns (string memory) {
@@ -93,7 +99,7 @@ contract MoonDAOEntity is ERC721URIStorage, URITemplate, IERC5643, Ownable {
         moonDAOTreasury = payable(_newTreasury);
     }
 
-    function mintTo(address to, uint256 adminHat, uint256 managerHat) external payable returns (uint256) {
+    function mintTo(address to, uint256 adminHat, uint256 managerHat, address _splitContract) external payable returns (uint256) {
 
         //TODO
         // require (Address.isContract(to), "To has to be Safe Contract");
@@ -103,8 +109,10 @@ contract MoonDAOEntity is ERC721URIStorage, URITemplate, IERC5643, Ownable {
         _mint(to, 1);
         renewSubscription(tokenId, 365 days);
 
-        entityAdminHat[tokenId] = adminHat;
-        entityManagerHat[tokenId] = managerHat;
+        teamAdminHat[tokenId] = adminHat;
+        teamManagerHat[tokenId] = managerHat;
+
+        splitContract[tokenId] = _splitContract;
 
         return tokenId;
     }
@@ -161,12 +169,12 @@ contract MoonDAOEntity is ERC721URIStorage, URITemplate, IERC5643, Ownable {
             revert InvalidTokenId();
         }
 
-        require(hats.isWearerOfHat(sender, entityManagerHat[tokenId]), "must wear ManagerHat");
+        require(hats.isWearerOfHat(sender, teamManagerHat[tokenId]), "must wear ManagerHat");
 
-        uint32 managerHatLevel = hats.getLocalHatLevel(entityManagerHat[tokenId]);
-        uint256 adminOfManagerHat = hats.getAdminAtLevel(entityManagerHat[tokenId], managerHatLevel - 1);
+        uint32 managerHatLevel = hats.getLocalHatLevel(teamManagerHat[tokenId]);
+        uint256 adminOfManagerHat = hats.getAdminAtLevel(teamManagerHat[tokenId], managerHatLevel - 1);
 
-        require(adminOfManagerHat == entityAdminHat[tokenId], "ManagerHat must be a child of AdminHat");
+        require(adminOfManagerHat == teamAdminHat[tokenId], "ManagerHat must be a child of AdminHat");
 
         return true;
     } 
@@ -222,8 +230,13 @@ contract MoonDAOEntity is ERC721URIStorage, URITemplate, IERC5643, Ownable {
         returns (uint256)
     {
         uint256 price = duration * pricePerSecond;
-        
-        return duration >= 365 days ? price * (1000 - renewDiscount) / 1000  : price;
+        address owner = this.ownerOf(tokenId);
+        return discountList.isWhitelisted(owner) ? price * (1000 - discount) / 1000  : price;
+    }
+
+    function getRenewalPrice(address owner, uint64 duration) external view returns (uint256) {
+        uint256 price = duration * pricePerSecond;
+        return discountList.isWhitelisted(owner) ? price * (1000 - discount) / 1000  : price;
     }
 
     /**

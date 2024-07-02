@@ -10,14 +10,18 @@ import {Whitelist} from "../src/Whitelist.sol";
 
 contract MyScript is Script {
     function run() external {
+        address TREASURY = 0xAF26a002d716508b7e375f1f620338442F5470c0;
+
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         vm.startBroadcast(deployerPrivateKey);
 
         Whitelist whitelist = new Whitelist();
 
+        Whitelist discountList = new Whitelist();
+
         MoonDaoCitizenTableland citizenTable  = new MoonDaoCitizenTableland("CITIZENTABLE");
 
-        MoonDAOCitizen citizen = new MoonDAOCitizen("MoonDaoCitizen", "MDC", 0x09224bC4a1Ea9ce55E953bFab083A055eC4d19B7, address(citizenTable), address(whitelist));
+        MoonDAOCitizen citizen = new MoonDAOCitizen("MoonDaoCitizen", "MDC", TREASURY, address(citizenTable), address(whitelist), address(discountList));
 
         citizen.setOpenAccess(true);
 

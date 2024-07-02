@@ -7,7 +7,7 @@ import {TablelandPolicy} from "@evm-tableland/contracts/TablelandPolicy.sol";
 import {Policies} from "@evm-tableland/contracts/policies/Policies.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
-contract EntityRowController is TablelandController, Ownable {
+contract TeamRowController is TablelandController, Ownable {
   address[] private _tableOwners;
   // Set the table owner during contract deployment
     constructor(address tableOwner) Ownable(msg.sender) {

@@ -5,15 +5,15 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {TablelandDeployments} from "@evm-tableland/contracts/utils/TablelandDeployments.sol";
 import {SQLHelpers} from "@evm-tableland/contracts/utils/SQLHelpers.sol";
 import {ERC721Holder} from "@openzeppelin/contracts/token/ERC721/utils/ERC721Holder.sol";
-import {MoonDAOEntity} from "../ERC5643.sol";
+import {MoonDAOTeam} from "../ERC5643.sol";
 
 
 contract JobBoardTable is ERC721Holder, Ownable {
     uint256 private _tableId;
     string private _TABLE_PREFIX;
-    MoonDAOEntity public _moonDaoEntity;
+    MoonDAOTeam public _moonDaoTeam;
     uint256 public currId = 0;
-    mapping(uint256 => uint256) public idToEntityId;
+    mapping(uint256 => uint256) public idToTeamId;
 
     constructor(string memory _table_prefix) Ownable(msg.sender) {
         _TABLE_PREFIX = _table_prefix;
@@ -23,20 +23,20 @@ contract JobBoardTable is ERC721Holder, Ownable {
                 "id integer primary key,"
                 "title text,"
                 "description text,"
-                "entityId integer,"
+                "teamId integer,"
                 "contactInfo text",
                 _TABLE_PREFIX
             )
         );
     }
 
-    function setMoonDaoEntity(address moonDaoEntity) external onlyOwner{
-        _moonDaoEntity = MoonDAOEntity(moonDaoEntity);
+    function setMoonDaoTeam(address moonDaoTeam) external onlyOwner{
+        _moonDaoTeam = MoonDAOTeam(moonDaoTeam);
     }
 
     // Let anyone insert into the table
-    function insertIntoTable(string memory title, string memory description, uint256 entityId, string memory contactInfo) external {
-        require (_moonDaoEntity.isManager(entityId, msg.sender) || owner() == msg.sender, "Only Admin can update");
+    function insertIntoTable(string memory title, string memory description, uint256 teamId, string memory contactInfo) external {
+        require (_moonDaoTeam.isManager(teamId, msg.sender) || owner() == msg.sender, "Only Admin can update");
         string memory setters = string.concat(
                 Strings.toString(currId), // Convert to a string
                 ",",
@@ -44,7 +44,7 @@ contract JobBoardTable is ERC721Holder, Ownable {
                 ",",
                 SQLHelpers.quote(description), // Wrap strings in single quotes with the `quote` method
                 ",",
-                Strings.toString(entityId),
+                Strings.toString(teamId),
                 ",",
                 SQLHelpers.quote(contactInfo) // Wrap strings in single quotes with the `quote` method
         );
@@ -54,18 +54,18 @@ contract JobBoardTable is ERC721Holder, Ownable {
             SQLHelpers.toInsert(
                 _TABLE_PREFIX,
                 _tableId,
-                "id,title,description,entityId,contactInfo",
+                "id,title,description,teamId,contactInfo",
                 setters
             )
         );
-        idToEntityId[currId] = entityId;
+        idToTeamId[currId] = teamId;
         currId += 1;
     }
 
-    function updateTable(uint256 id, string memory title, string memory description, uint256 entityId, string memory contactInfo) external {
+    function updateTable(uint256 id, string memory title, string memory description, uint256 teamId, string memory contactInfo) external {
         
-        require (_moonDaoEntity.isManager(entityId, msg.sender) || owner() == msg.sender, "Only Admin can update");
-        require (idToEntityId[id] == entityId, "You can only update job post by your entity");
+        require (_moonDaoTeam.isManager(teamId, msg.sender) || owner() == msg.sender, "Only Admin can update");
+        require (idToTeamId[id] == teamId, "You can only update job post by your team");
 
         // Set the values to update
         string memory setters = string.concat(
@@ -90,10 +90,10 @@ contract JobBoardTable is ERC721Holder, Ownable {
     }
 
     // Update only the row that the caller inserted
-    function updateTableCol(uint256 id, uint256 entityId, string memory colName, string memory val) external {
+    function updateTableCol(uint256 id, uint256 teamId, string memory colName, string memory val) external {
         require (Strings.equal(colName, "id"), "Cannot update id");
-        require (Strings.equal(colName, "entityId"), "Cannot update entityId");
-        require (_moonDaoEntity.isManager(entityId, msg.sender) || owner() == msg.sender, "Only Admin can update");
+        require (Strings.equal(colName, "teamId"), "Cannot update teamId");
+        require (_moonDaoTeam.isManager(teamId, msg.sender) || owner() == msg.sender, "Only Admin can update");
 
         // Set the values to update
         string memory setters = string.concat(colName, "=", SQLHelpers.quote(val));
@@ -112,9 +112,9 @@ contract JobBoardTable is ERC721Holder, Ownable {
 
 
     // Delete a row from the table by ID 
-    function deleteFromTable(uint256 id, uint256 entityId) external {
-        require (_moonDaoEntity.isManager(entityId, msg.sender) || owner() == msg.sender, "Only Admin can update");
-        require (idToEntityId[id] == entityId, "You can only delete job post by your entity");
+    function deleteFromTable(uint256 id, uint256 teamId) external {
+        require (_moonDaoTeam.isManager(teamId, msg.sender) || owner() == msg.sender, "Only Admin can update");
+        require (idToTeamId[id] == teamId, "You can only delete job post by your team");
 
         // Specify filters for which row to delete
         string memory filters = string.concat(

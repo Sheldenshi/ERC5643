@@ -1,22 +1,22 @@
 pragma solidity ^0.8.20;
 
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
-import {MoonDAOEntity} from "./ERC5643.sol";
+import {MoonDAOTeam} from "./ERC5643.sol";
 import {MarketPlace} from "./MarketPlace.sol";
 
 contract MarketplaceAssetController is Ownable{
   MarketPlace marketplace;
   bytes32 assetRole;
-  MoonDAOEntity public _moonDaoEntity;
+  MoonDAOTeam public _moonDaoTeam;
 
-  constructor(address _marketplace, bytes32 _assetRole, address moonDaoEntity) Ownable(msg.sender) {
+  constructor(address _marketplace, bytes32 _assetRole, address moonDaoTeam) Ownable(msg.sender) {
     marketplace = MarketPlace(_marketplace);
     assetRole = _assetRole;
-    _moonDaoEntity = MoonDAOEntity(moonDaoEntity);
+    _moonDaoTeam = MoonDAOTeam(moonDaoTeam);
   }
 
-   function setMoonDaoEntity(address moonDaoEntity) external onlyOwner{
-        _moonDaoEntity = MoonDAOEntity(moonDaoEntity);
+   function setMoonDaoTeam(address moonDaoTeam) external onlyOwner{
+        _moonDaoTeam = MoonDAOTeam(moonDaoTeam);
     }
 
   function setMarketplace(address _marketplace) public onlyOwner{
@@ -27,9 +27,9 @@ contract MarketplaceAssetController is Ownable{
     assetRole = _assetRole;
   }
 
-  function addCollection(uint entityId, address collection) public {
-    // check that the msg.sender is an admin/owner of the entity
-    require (_moonDaoEntity.isManager(entityId, msg.sender), "Only Admin can add collection");
+  function addCollection(uint teamId, address collection) public {
+    // check that the msg.sender is an admin/owner of the team
+    require (_moonDaoTeam.isManager(teamId, msg.sender), "Only Admin can add collection");
 
     // grantRole to collection
     marketplace.grantRole(assetRole, collection);
